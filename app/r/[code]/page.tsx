@@ -1,50 +1,75 @@
 // app/r/[code]/page.tsx
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 type Props = { params: { code: string } };
 
-export default async function Page({ params }: Props) {
-  const { code } = params;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
+
+async function fetchShareData(code: string) {
+  const res = await fetch(
+    `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) throw new Error("Failed to fetch metadata");
+  const data = await res.json();
+  return {
+    title: data.metadataTitle || "Promotix",
+    description: data.metadataDescription || "Shared via Promotix",
+    image: data.metadataImage || "https://promotix.io/og-default.png",
+    destinationUrl: data.destinationUrl || "https://promotix.io",
+  };
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
-    const res = await fetch(
-      `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
-      { cache: "no-store" } // always get fresh data
-    );
+    const { title, description, image } = await fetchShareData(params.code);
+    const shareUrl = `${SITE_URL}/r/${params.code}`;
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: shareUrl,
+        type: "website",
+        images: [{ url: image }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [image],
+      },
+      alternates: { canonical: shareUrl },
+    };
+  } catch {
+    return {
+      title: "Promotix",
+      description: "Shared via Promotix",
+    };
+  }
+}
 
-    if (!res.ok) throw new Error("Failed to fetch metadata");
-
-    const data = await res.json();
-
-    const title = data.metadataTitle || "Promotix";
-    const description = data.metadataDescription || "Shared via Promotix";
-    const image = data.metadataImage || "https://promotix.io/og-default.png";
-    const destinationUrl = data.destinationUrl || "https://promotix.io";
-
+export default async function Page({ params }: Props) {
+  try {
+    const { destinationUrl } = await fetchShareData(params.code);
     return (
-      <html lang="en">
-        <head>
-          {/* Page metadata */}
-          <title>{title}</title>
-          <meta name="description" content={description} />
-          <meta property="og:title" content={title} />
-          <meta property="og:description" content={description} />
-          <meta property="og:image" content={image} />
-          <meta property="og:type" content="website" />
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={title} />
-          <meta name="twitter:description" content={description} />
-          <meta name="twitter:image" content={image} />
-
-          {/* Automatic redirect */}
-          <meta httpEquiv="refresh" content={`0; url=${destinationUrl}`} />
-        </head>
-        <body>
+      <>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.location.replace(${JSON.stringify(destinationUrl)});`,
+          }}
+        />
+        <noscript>
           <p>
             Redirecting to <a href={destinationUrl}>{destinationUrl}</a>...
           </p>
-        </body>
-      </html>
+        </noscript>
+      </>
     );
   } catch (error) {
     console.error("Error fetching metadata:", error);
