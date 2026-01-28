@@ -14,7 +14,7 @@ const SITE_URL =
 
 /**
  * Fetch metadata for share link
- * This runs on the SERVER only
+ * This runs on the SERVER only and only
  */
 async function fetchShareData(code: string) {
   const fallback = {
