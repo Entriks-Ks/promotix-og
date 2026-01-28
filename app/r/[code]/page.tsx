@@ -1,74 +1,63 @@
-// pages/r/[code].tsx
-import { GetServerSideProps } from "next";
+// app/r/[code]/page.tsx
+import { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-type Recommendation = {
-  title: string;
-  description: string;
-  imageUrl: string;
-};
+const SITE_URL = "https://og.promotix.io"; // your site base
 
-type Props = {
-  recommendation: Recommendation | null;
-  code: string;
-};
-
-export default function RecommendationPage({ recommendation, code }: Props) {
-  if (!recommendation) {
-    return (
-      <div>
-        <h1>Recommendation Not Found</h1>
-        <p>Sorry, the code {code} does not exist.</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <head>
-        <title>{recommendation.title}</title>
-        <meta name="description" content={recommendation.description} />
-        <meta property="og:title" content={recommendation.title} />
-        <meta property="og:description" content={recommendation.description} />
-        <meta property="og:image" content={recommendation.imageUrl} />
-        <meta property="og:url" content={`https://og.promotix.io/r/${code}`} />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={recommendation.title} />
-        <meta name="twitter:description" content={recommendation.description} />
-        <meta name="twitter:image" content={recommendation.imageUrl} />
-      </head>
-      <body>
-        <h1>{recommendation.title}</h1>
-        <p>{recommendation.description}</p>
-        <img src={recommendation.imageUrl} alt={recommendation.title} />
-      </body>
-    </>
-  );
+interface ShareData {
+  metadataTitle: string;
+  metadataDescription: string;
+  metadataImage: string;
+  destinationUrl: string;
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  const code = context.params?.code as string;
+async function fetchShareData(code: string): Promise<ShareData> {
+  const res = await fetch(
+    `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch share data");
+  return res.json();
+}
 
-  try {
-    // Example fetch from your DB or API
-    const res = await fetch(`https://api.promotix.io/recommendations/${code}`);
-    if (!res.ok) throw new Error("Not found");
+// Generate metadata dynamically
+export async function generateMetadata({
+  params,
+}: {
+  params: { code: string };
+}): Promise<Metadata> {
+  const data = await fetchShareData(params.code);
+  const shareUrl = `${SITE_URL}/r/${params.code}`;
 
-    const recommendation = await res.json();
+  return {
+    title: data.metadataTitle,
+    description: data.metadataDescription,
+    alternates: {
+      canonical: shareUrl,
+    },
+    openGraph: {
+      title: data.metadataTitle,
+      description: data.metadataDescription,
+      url: shareUrl,
+      images: [{ url: data.metadataImage }],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: data.metadataTitle,
+      description: data.metadataDescription,
+      images: [data.metadataImage],
+    },
+  };
+}
 
-    return {
-      props: {
-        recommendation,
-        code,
-      },
-    };
-  } catch (err) {
-    // Return null for recommendation if code not found
-    return {
-      props: {
-        recommendation: null,
-        code,
-      },
-    };
-  }
-};
+// Page component that redirects the user
+export default async function SharePage({
+  params,
+}: {
+  params: { code: string };
+}) {
+  const data = await fetchShareData(params.code);
+
+  // Server-side redirect to destination
+  redirect(data.destinationUrl);
+}
