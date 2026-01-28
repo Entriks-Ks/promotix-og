@@ -3,10 +3,11 @@ import type { GetServerSideProps } from "next";
 
 type Props = {
   exists: boolean;
-  title?: string;
-  description?: string;
-  image?: string;
-  shareUrl?: string;
+  title: string;
+  description: string;
+  image: string;
+  shareUrl: string;
+  redirectUrl: string;
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
@@ -15,7 +16,16 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
   const code = context.params?.code as string | undefined;
 
   if (!code) {
-    return { props: { exists: false } };
+    return {
+      props: {
+        exists: false,
+        title: "Promotix",
+        description: "Shared via Promotix",
+        image: "https://promotix.io/og-default.png",
+        shareUrl: `${SITE_URL}/r/unknown`,
+        redirectUrl: "https://promotix.io",
+      },
+    };
   }
 
   const fallback = {
@@ -32,9 +42,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
       { cache: "no-store", headers: { accept: "application/json" } }
     );
 
-    if (!res.ok) {
-      return { props: { exists: false } };
-    }
+    if (!res.ok) throw new Error("bad response");
 
     const data = await res.json();
 
@@ -42,6 +50,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     const description = data.metadataDescription || fallback.description;
     const image = data.metadataImage || fallback.image;
     const shareUrl = `${SITE_URL}/r/${code}`;
+    const redirectUrl = data.destinationUrl || "https://promotix.io";
 
     return {
       props: {
@@ -50,30 +59,25 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
         description,
         image,
         shareUrl,
+        redirectUrl,
       },
     };
   } catch {
-    return { props: { exists: false } };
+    return {
+      props: {
+        exists: false,
+        title: fallback.title,
+        description: fallback.description,
+        image: fallback.image,
+        shareUrl: `${SITE_URL}/r/${code}`,
+        redirectUrl: "https://promotix.io",
+      },
+    };
   }
 };
 
 export default function RecommendationPage(props: Props) {
-  if (!props.exists) {
-    return (
-      <>
-        <Head>
-          <title>Recommendation not found</title>
-          <meta name="robots" content="noindex" />
-        </Head>
-        <main style={{ maxWidth: 680, margin: "40px auto", padding: 16 }}>
-          <h1>Recommendation not found</h1>
-          <p>The requested recommendation code does not exist.</p>
-        </main>
-      </>
-    );
-  }
-
-  const { title, description, image, shareUrl } = props;
+  const { title, description, image, shareUrl, redirectUrl } = props;
 
   return (
     <>
@@ -96,6 +100,9 @@ export default function RecommendationPage(props: Props) {
 
         {/* Canonical */}
         <link rel="canonical" href={shareUrl} />
+
+        {/* Immediate redirect for users while bots still see OG tags */}
+        <meta httpEquiv="refresh" content={`0; url=${redirectUrl}`} />
       </Head>
       <main style={{ maxWidth: 680, margin: "40px auto", padding: 16 }}>
         <h1>{title}</h1>
@@ -107,7 +114,20 @@ export default function RecommendationPage(props: Props) {
             style={{ width: "100%", height: "auto", borderRadius: 8 }}
           />
         )}
+        <p style={{ marginTop: 16 }}>
+          Redirecting to <a href={redirectUrl}>{redirectUrl}</a>...
+        </p>
       </main>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.location.replace(${JSON.stringify(redirectUrl)});`,
+        }}
+      />
+      <noscript>
+        <p>
+          Redirecting to <a href={redirectUrl}>{redirectUrl}</a>...
+        </p>
+      </noscript>
     </>
   );
 }
