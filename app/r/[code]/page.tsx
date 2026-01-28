@@ -2,13 +2,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-type Props = { params: { code: string } };
+type Props = {
+  params: { code: string };
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
 
+/**
+ * Fetch metadata for share link
+ * This runs on the SERVER only
+ */
 async function fetchShareData(code: string) {
   const fallback = {
     title: "Promotix",
@@ -22,63 +29,83 @@ async function fetchShareData(code: string) {
       `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
       { cache: "no-store" }
     );
+
     if (!res.ok) return fallback;
+
     const data = await res.json();
+
     return {
       title: data.metadataTitle || fallback.title,
-      description: data.metadataDescription || fallback.description,
+      description:
+        data.metadataDescription || fallback.description,
       image: data.metadataImage || fallback.image,
-      destinationUrl: data.destinationUrl || fallback.destinationUrl,
+      destinationUrl:
+        data.destinationUrl || fallback.destinationUrl,
     };
-  } catch (e) {
+  } catch {
     return fallback;
   }
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  try {
-    const { title, description, image } = await fetchShareData(params.code);
-    const shareUrl = `${SITE_URL}/r/${params.code}`;
-    return {
-      title,
-      description,
-      openGraph: {
-        title,
-        description,
-        url: shareUrl,
-        type: "website",
-        images: [{ url: image }],
-      },
-      twitter: {
-        card: "summary_large_image",
-        title,
-        description,
-        images: [image],
-      },
-      alternates: { canonical: shareUrl },
-    };
-  } catch {
-    return {
-      title: "Promotix",
-      description: "Shared via Promotix",
-    };
-  }
+/**
+ * SERVER-SIDE OG METADATA (critical)
+ */
+export async function generateMetadata(
+  { params }: Props
+): Promise<Metadata> {
+  const data = await fetchShareData(params.code);
+
+  const shareUrl = `${SITE_URL}/r/${params.code}`;
+
+  return {
+    title: data.title,
+    description: data.description,
+    openGraph: {
+      title: data.title,
+      description: data.description,
+      url: shareUrl,
+      type: "website",
+      images: [{ url: data.image }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: data.title,
+      description: data.description,
+      images: [data.image],
+    },
+    alternates: {
+      canonical: shareUrl,
+    },
+  };
 }
 
+/**
+ * PAGE HTML (bots read this!)
+ */
 export default async function Page({ params }: Props) {
-  const { destinationUrl } = await fetchShareData(params.code);
+  const { title, description, destinationUrl } =
+    await fetchShareData(params.code);
+
   return (
-    <>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `window.location.replace(${JSON.stringify(destinationUrl)});`,
-        }}
-      />
-      <noscript>
+    <html>
+      <head>
+        {/* Browser redirect (ignored by OG bots) */}
+        <meta
+          httpEquiv="refresh"
+          content={`0; url=${destinationUrl}`}
+        />
+      </head>
+
+      <body>
+        {/* Visible content for crawlers */}
+        <h1>{title}</h1>
+        <p>{description}</p>
+
         <p>
-          Redirecting to <a href={destinationUrl}>{destinationUrl}</a>...
+          Redirecting to{" "}
+          <a href={destinationUrl}>{destinationUrl}</a>
         </p>
-      </noscript>
-    </>
+      </body>
+    </html>
   );
 }
