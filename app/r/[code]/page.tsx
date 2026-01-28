@@ -10,18 +10,29 @@ export const revalidate = 0;
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
 
 async function fetchShareData(code: string) {
-  const res = await fetch(
-    `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
-    { cache: "no-store" }
-  );
-  if (!res.ok) throw new Error("Failed to fetch metadata");
-  const data = await res.json();
-  return {
-    title: data.metadataTitle || "Promotix",
-    description: data.metadataDescription || "Shared via Promotix",
-    image: data.metadataImage || "https://promotix.io/og-default.png",
-    destinationUrl: data.destinationUrl || "https://promotix.io",
+  const fallback = {
+    title: "Promotix",
+    description: "Shared via Promotix",
+    image: "https://promotix.io/og-default.png",
+    destinationUrl: "https://promotix.io",
   };
+
+  try {
+    const res = await fetch(
+      `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    return {
+      title: data.metadataTitle || fallback.title,
+      description: data.metadataDescription || fallback.description,
+      image: data.metadataImage || fallback.image,
+      destinationUrl: data.destinationUrl || fallback.destinationUrl,
+    };
+  } catch (e) {
+    return fallback;
+  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -55,24 +66,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function Page({ params }: Props) {
-  try {
-    const { destinationUrl } = await fetchShareData(params.code);
-    return (
-      <>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.location.replace(${JSON.stringify(destinationUrl)});`,
-          }}
-        />
-        <noscript>
-          <p>
-            Redirecting to <a href={destinationUrl}>{destinationUrl}</a>...
-          </p>
-        </noscript>
-      </>
-    );
-  } catch (error) {
-    console.error("Error fetching metadata:", error);
-    notFound();
-  }
+  const { destinationUrl } = await fetchShareData(params.code);
+  return (
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.location.replace(${JSON.stringify(destinationUrl)});`,
+        }}
+      />
+      <noscript>
+        <p>
+          Redirecting to <a href={destinationUrl}>{destinationUrl}</a>...
+        </p>
+      </noscript>
+    </>
+  );
 }
