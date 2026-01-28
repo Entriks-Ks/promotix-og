@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 type Props = { params: { code: string } };
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // important to prevent caching at build-time
 export const revalidate = 0;
 
 const SITE_URL = "https://og.promotix.io";
@@ -16,7 +16,6 @@ type ShareData = {
   code: string;
 };
 
-// Fetch from Supabase (returns exactly what you pasted)
 async function fetchShareData(code: string): Promise<ShareData> {
   try {
     const res = await fetch(
@@ -32,7 +31,6 @@ async function fetchShareData(code: string): Promise<ShareData> {
       code: data.code,
     };
   } catch {
-    // fallback in case of error
     return {
       title: "Promotix",
       description: "Shared via Promotix",
@@ -43,10 +41,11 @@ async function fetchShareData(code: string): Promise<ShareData> {
   }
 }
 
-// SERVER-SIDE OG metadata
+// Server-side metadata
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  if (!params.code) return { title: "Promotix", description: "Shared via Promotix" };
+
   const data = await fetchShareData(params.code);
-  const shareUrl = `${SITE_URL}/r/${data.code}`;
 
   return {
     title: data.title,
@@ -54,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: data.title,
       description: data.description,
-      url: shareUrl,
+      url: `${SITE_URL}/r/${data.code}`,
       type: "website",
       images: [{ url: data.image }],
     },
@@ -65,29 +64,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [data.image],
     },
     alternates: {
-      canonical: shareUrl,
+      canonical: `${SITE_URL}/r/${data.code}`,
     },
   };
 }
 
-// PAGE HTML — WhatsApp-safe
+// Page content with redirect
 export default async function Page({ params }: Props) {
   const data = await fetchShareData(params.code);
 
   return (
     <html lang="en">
       <head>
-        <meta
-          httpEquiv="refresh"
-          content={`0; url=${data.destinationUrl}`}
-        />
+        {/* Force immediate redirect in browser */}
+        <meta httpEquiv="refresh" content={`0; url=${data.destinationUrl}`} />
+        <title>{data.title}</title>
+        <meta name="description" content={data.description} />
       </head>
       <body>
         <h1>{data.title}</h1>
         <p>{data.description}</p>
         <p>
-          Redirecting to{" "}
-          <a href={data.destinationUrl}>{data.destinationUrl}</a>
+          Redirecting to <a href={data.destinationUrl}>{data.destinationUrl}</a>
         </p>
       </body>
     </html>
