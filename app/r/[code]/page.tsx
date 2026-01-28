@@ -1,61 +1,52 @@
 // app/r/[code]/page.tsx
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
-type Props = {
-  params: { code: string };
-};
+type Props = { params: { code: string } };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
+const SITE_URL = "https://og.promotix.io";
 
-/**
- * Fetch metadata for share link
- * This runs on the SERVER only and only
- */
-async function fetchShareData(code: string) {
-  const fallback = {
-    title: "Promotix",
-    description: "Shared via Promotix",
-    image: "https://promotix.io/og-default.png",
-    destinationUrl: "https://promotix.io",
-  };
+type ShareData = {
+  title: string;
+  description: string;
+  image: string;
+  destinationUrl: string;
+  code: string;
+};
 
+// Fetch from Supabase (returns exactly what you pasted)
+async function fetchShareData(code: string): Promise<ShareData> {
   try {
     const res = await fetch(
       `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${code}`,
       { cache: "no-store" }
     );
-
-    if (!res.ok) return fallback;
-
     const data = await res.json();
-
     return {
-      title: data.metadataTitle || fallback.title,
-      description:
-        data.metadataDescription || fallback.description,
-      image: data.metadataImage || fallback.image,
-      destinationUrl:
-        data.destinationUrl || fallback.destinationUrl,
+      title: data.metadataTitle,
+      description: data.metadataDescription,
+      image: data.metadataImage,
+      destinationUrl: data.destinationUrl,
+      code: data.code,
     };
   } catch {
-    return fallback;
+    // fallback in case of error
+    return {
+      title: "Promotix",
+      description: "Shared via Promotix",
+      image: "https://promotix.io/og-default.png",
+      destinationUrl: "https://promotix.io",
+      code,
+    };
   }
 }
 
-/**
- * SERVER-SIDE OG METADATA (critical)
- */
-export async function generateMetadata(
-  { params }: Props
-): Promise<Metadata> {
+// SERVER-SIDE OG metadata
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await fetchShareData(params.code);
-
-  const shareUrl = `${SITE_URL}/r/${params.code}`;
+  const shareUrl = `${SITE_URL}/r/${data.code}`;
 
   return {
     title: data.title,
@@ -79,31 +70,24 @@ export async function generateMetadata(
   };
 }
 
-/**
- * PAGE HTML (bots read this!)
- */
+// PAGE HTML — WhatsApp-safe
 export default async function Page({ params }: Props) {
-  const { title, description, destinationUrl } =
-    await fetchShareData(params.code);
+  const data = await fetchShareData(params.code);
 
   return (
-    <html>
+    <html lang="en">
       <head>
-        {/* Browser redirect (ignored by OG bots) */}
         <meta
           httpEquiv="refresh"
-          content={`0; url=${destinationUrl}`}
+          content={`0; url=${data.destinationUrl}`}
         />
       </head>
-
       <body>
-        {/* Visible content for crawlers */}
-        <h1>{title}</h1>
-        <p>{description}</p>
-
+        <h1>{data.title}</h1>
+        <p>{data.description}</p>
         <p>
           Redirecting to{" "}
-          <a href={destinationUrl}>{destinationUrl}</a>
+          <a href={data.destinationUrl}>{data.destinationUrl}</a>
         </p>
       </body>
     </html>
