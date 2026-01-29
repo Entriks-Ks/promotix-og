@@ -104,7 +104,7 @@ export default function RecommendationPage(props: Props) {
         {/* Immediate redirect for users while bots still see OG tags */}
         <meta httpEquiv="refresh" content={`0; url=${redirectUrl}`} />
       </Head>
-      <main style={{ maxWidth: 680, margin: "40px auto", padding: 16 }}>
+      {/* <main style={{ maxWidth: 680, margin: "40px auto", padding: 16 }}>
         <h1>{title}</h1>
         <p>{description}</p>
         {image && (
@@ -117,7 +117,7 @@ export default function RecommendationPage(props: Props) {
         <p style={{ marginTop: 16 }}>
           Redirecting to <a href={redirectUrl}>{redirectUrl}</a>...
         </p>
-      </main>
+      </main> */}
       <script
         dangerouslySetInnerHTML={{
           __html: `window.location.replace(${JSON.stringify(redirectUrl)});`,
