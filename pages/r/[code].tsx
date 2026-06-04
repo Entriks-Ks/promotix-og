@@ -36,7 +36,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
 
   try {
     const res = await fetch(
-      `https://xnivbvpdkkfxgwmboqsv.supabase.co/functions/v1/get-link-metadata?code=${encodeURIComponent(
+      `https://tmvrcilrkpfcudovevyi.supabase.co/functions/v1/get-link-metadata?code=${encodeURIComponent(
         code
       )}`,
       { cache: "no-store", headers: { accept: "application/json" } }
