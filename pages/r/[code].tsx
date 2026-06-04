@@ -10,10 +10,35 @@ type Props = {
   redirectUrl: string;
 };
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://og.promotix.io";
+type Config = {
+  SITE_URL: string;
+  SUPABASE_PROJECT_ID: string;
+};
 
-export const getServerSideProps: GetServerSideProps<Props> = async (context) => {
+const getConfigByHost = (host: string | undefined): Config => {
+  const cleanHost = host?.toLowerCase() || "";
+
+  if (cleanHost.includes("crmaipro.de")) {
+    return {
+      SITE_URL: "https://crmaipro.de",
+      SUPABASE_PROJECT_ID: "tmvrcilrkpfcudovevyi",
+    };
+  }
+
+  // default = production
+  return {
+    SITE_URL: "https://promotix.io",
+    SUPABASE_PROJECT_ID: "tmvrcilrkpfcudovevyi",
+  };
+};
+
+export const getServerSideProps: GetServerSideProps<Props> = async (
+  context
+) => {
   const code = context.params?.code as string | undefined;
+  const host = context.req.headers.host;
+
+  const { SITE_URL, SUPABASE_PROJECT_ID } = getConfigByHost(host);
 
   if (!code) {
     return {
@@ -36,10 +61,13 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
 
   try {
     const res = await fetch(
-      `https://tmvrcilrkpfcudovevyi.supabase.co/functions/v1/get-link-metadata?code=${encodeURIComponent(
+      `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/get-link-metadata?code=${encodeURIComponent(
         code
       )}`,
-      { cache: "no-store", headers: { accept: "application/json" } }
+      {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      }
     );
 
     if (!res.ok) throw new Error("bad response");
@@ -49,6 +77,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     const title = data.metadataTitle || fallback.title;
     const description = data.metadataDescription || fallback.description;
     const image = data.metadataImage || fallback.image;
+
     const shareUrl = `${SITE_URL}/r/${code}`;
     const redirectUrl = data.destinationUrl || "https://promotix.io";
 
@@ -85,14 +114,14 @@ export default function RecommendationPage(props: Props) {
         <title>{title}</title>
         <meta name="description" content={description} />
 
-        {/* Open Graph for Facebook/WhatsApp/LinkedIn */}
+        {/* Open Graph */}
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:image" content={image} />
         <meta property="og:url" content={shareUrl} />
         <meta property="og:type" content="website" />
 
-        {/* Twitter cards */}
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
@@ -101,28 +130,16 @@ export default function RecommendationPage(props: Props) {
         {/* Canonical */}
         <link rel="canonical" href={shareUrl} />
 
-        {/* Immediate redirect for users while bots still see OG tags */}
+        {/* Redirect */}
         <meta httpEquiv="refresh" content={`0; url=${redirectUrl}`} />
       </Head>
-      {/* <main style={{ maxWidth: 680, margin: "40px auto", padding: 16 }}>
-        <h1>{title}</h1>
-        <p>{description}</p>
-        {image && (
-          <img
-            src={image}
-            alt={title ?? "Recommendation image"}
-            style={{ width: "100%", height: "auto", borderRadius: 8 }}
-          />
-        )}
-        <p style={{ marginTop: 16 }}>
-          Redirecting to <a href={redirectUrl}>{redirectUrl}</a>...
-        </p>
-      </main> */}
+
       <script
         dangerouslySetInnerHTML={{
           __html: `window.location.replace(${JSON.stringify(redirectUrl)});`,
         }}
       />
+
       <noscript>
         <p>
           Redirecting to <a href={redirectUrl}>{redirectUrl}</a>...
