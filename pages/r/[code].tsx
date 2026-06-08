@@ -28,7 +28,7 @@ const getConfigByHost = (host: string | undefined): Config => {
   // default = production
   return {
     SITE_URL: "https://promotix.io",
-    SUPABASE_PROJECT_ID: "tmvrcilrkpfcudovevyi",
+    SUPABASE_PROJECT_ID: "xnivbvpdkkfxgwmboqsv",
   };
 };
 
@@ -46,9 +46,9 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
         exists: false,
         title: "Promotix",
         description: "Shared via Promotix",
-        image: "https://promotix.io/og-default.png",
+        image: "${SITE_URL}/og-default.png",
         shareUrl: `${SITE_URL}/r/unknown`,
-        redirectUrl: "https://promotix.io",
+        redirectUrl: SITE_URL,
       },
     };
   }
@@ -56,7 +56,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
   const fallback = {
     title: "Promotix",
     description: "Shared via Promotix",
-    image: "https://promotix.io/og-default.png",
+    image: "${SITE_URL}/og-default.png",
   };
 
   try {
@@ -79,7 +79,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
     const image = data.metadataImage || fallback.image;
 
     const shareUrl = `${SITE_URL}/r/${code}`;
-    const redirectUrl = data.destinationUrl || "https://promotix.io";
+    const redirectUrl = data.destinationUrl || SITE_URL;
 
     return {
       props: {
@@ -99,7 +99,7 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
         description: fallback.description,
         image: fallback.image,
         shareUrl: `${SITE_URL}/r/${code}`,
-        redirectUrl: "https://promotix.io",
+        redirectUrl: SITE_URL,
       },
     };
   }
